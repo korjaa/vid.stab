@@ -26,10 +26,10 @@
 #include "vidstabdefines.h"
 
 
-void boxblur_hori_C(unsigned char* dest, const unsigned char* src,
-                    int width, int height, int dest_strive, int src_strive, int size);
-void boxblur_vert_C(unsigned char* dest, const unsigned char* src,
-                    int width, int height, int dest_strive, int src_strive, int size);
+void boxblur_hori_C(unsigned char* const dest, const unsigned char* const src,
+                    const int width, const int height, const int dest_strive, const int src_strive, const int size);
+void boxblur_vert_C(unsigned char* const dest, const unsigned char* const src,
+                    const int width, const int height, const int dest_strive, const int src_strive, const int size);
 
 /*
   The algorithm:
@@ -129,8 +129,9 @@ void boxblurPlanar(VSFrame* dest, const VSFrame* src,
 /* } */
 
 
-void boxblur_hori_C(unsigned char* dest, const unsigned char* src,
-                    int width, int height, int dest_strive, int src_strive, int size){
+void boxblur_hori_C(unsigned char* const dest, const unsigned char* const src,
+                    const int width, const int height, const int dest_strive, const int src_strive, const int size){
+
   int i,j,k;
   unsigned int acc;
   const unsigned char *start, *end; // start and end of kernel
@@ -159,8 +160,9 @@ void boxblur_hori_C(unsigned char* dest, const unsigned char* src,
   }
 }
 
-void boxblur_vert_C(unsigned char* dest, const unsigned char* src,
-        int width, int height, int dest_strive, int src_strive, int size){
+void boxblur_vert_C(unsigned char* dest, const unsigned char* const src,
+        const int width, const int height, const int dest_strive, const int src_strive, const int size) {
+
   int i,j,k;
   int acc;
   const unsigned char *start, *end; // start and end of kernel

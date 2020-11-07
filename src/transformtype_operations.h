@@ -136,24 +136,13 @@ VSArray localmotionsGetMatch(const LocalMotions* localmotions);
 /* helper functions */
 
 /* optimized round function */
-inline static int myround(float x) {
-    if(x>0)
-        return x + 0.5;
-    else
-        return x - 0.5;
-}
-
+#define ROUND_FLOAT(x) ((int)(x>0?x+.5:x-.5))
 
 /* optimized floor function
    This does not give the correct value for negative integer values like -1.0. In this case
    it will produce -2.0.
 */
-inline static int myfloor(float x) {
-    if(x<0)
-        return x - 1;
-    else
-        return x;
-}
+#define FLOOR_FLOAT(x) ((int)(x<0?x-1:x))
 
 #endif
 

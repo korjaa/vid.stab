@@ -341,10 +341,8 @@ double contrastSubImgPlanar(VSMotionDetect* md, const Field* field) {
 */
 double contrastSubImgPacked(VSMotionDetect* md, const Field* field) {
   unsigned char* const I = md->curr.data[0];
-  int linesize2 = md->curr.linesize[0]/3; // linesize in pixels
-  return (contrastSubImg(I, field, linesize2, md->fi.height, 3)
-          + contrastSubImg(I + 1, field, linesize2, md->fi.height, 3)
-          + contrastSubImg(I + 2, field, linesize2, md->fi.height, 3)) / 3;
+  const int linesize2 = md->curr.linesize[0]/3; // linesize in pixels
+  return contrastSubImg(I, field, linesize2, md->fi.height, 3);
 }
 
 /**
@@ -355,26 +353,34 @@ double contrastSubImgPacked(VSMotionDetect* md, const Field* field) {
    \param field Field specifies position(center) and size of subimage
    \param width width of frame (linesize in pixels)
    \param height height of frame
-   \param bytesPerPixel calc contrast for only for first channel
+   \param channels number of channels in a pixel
 */
 double contrastSubImg(unsigned char* const I, const Field* field, int width,
-                      int height, int bytesPerPixel) {
-  int k, j;
+                      int height, int channels) {
+  int k, j, m;
   unsigned char* p = NULL;
-  int s2 = field->size / 2;
-  unsigned char mini = 255;
-  unsigned char maxi = 0;
+  const int s2 = field->size / 2;
+  const int stride = (width - field->size) * channels;
+  unsigned char mini[4] = {255, 255, 255, 255};
+  unsigned char maxi[4] = {0, 0, 0, 0};
+  double value = 0;
 
-  p = I + ((field->x - s2) + (field->y - s2) * width) * bytesPerPixel;
+  p = I + ((field->x - s2) + (field->y - s2) * width) * channels;
   for (j = 0; j < field->size; j++) {
     for (k = 0; k < field->size; k++) {
-      mini = (mini < *p) ? mini : *p;
-      maxi = (maxi > *p) ? maxi : *p;
-      p += bytesPerPixel;
+      for(m = 0; m < channels; m++, p++) {
+        mini[m] = (mini[m] < *p) ? mini[m] : *p;
+        maxi[m] = (maxi[m] > *p) ? maxi[m] : *p;
+      }
     }
-    p += (width - field->size) * bytesPerPixel;
+    p += stride;
   }
-  return (maxi - mini) / (maxi + mini + 0.1); // +0.1 to avoid division by 0
+
+  for(m = 0; m < channels; m++) {
+    value += (maxi[m] - mini[m]) / (maxi[m] + mini[m] + 0.1); // +0.1 to avoid division by 0
+  }
+
+  return channels == 1 ? value : value / channels;
 }
 
 /* calculates the optimal transformation for one field in Planar frames
@@ -887,22 +893,23 @@ unsigned int compareSubImg_thr(unsigned char* const I1, unsigned char* const I2,
   int k, j;
   unsigned char* p1 = NULL;
   unsigned char* p2 = NULL;
-  int s2 = field->size / 2;
+  const int s2 = field->size / 2;
+  const int k_len = field->size * bytesPerPixel;
+  const int p1_stride = (width1 - field->size) * bytesPerPixel;
+  const int p2_stride = (width2 - field->size) * bytesPerPixel;
   unsigned int sum = 0;
 
   p1 = I1 + ((field->x - s2) + (field->y - s2) * width1) * bytesPerPixel;
-  p2 = I2 + ((field->x - s2 + d_x) + (field->y - s2 + d_y) * width2)
-    * bytesPerPixel;
-  for (j = 0; j < field->size; j++) {
-    for (k = 0; k < field->size * bytesPerPixel; k++) {
+  p2 = I2 + ((field->x - s2 + d_x) + (field->y - s2 + d_y) * width2) * bytesPerPixel;
+  for (j = 0; j < field->size; ++j) {
+    for (k = 0; k < k_len; ++k, ++p1, ++p2) {
       sum += abs((int) *p1 - (int) *p2);
-      p1++;
-      p2++;
     }
-    if( sum > threshold) // no need to calculate any longer: worse than the best match
+    if(sum > threshold) {// no need to calculate any longer: worse than the best match
       break;
-    p1 += (width1 - field->size) * bytesPerPixel;
-    p2 += (width2 - field->size) * bytesPerPixel;
+    }
+    p1 += p1_stride;
+    p2 += p2_stride;
   }
   return sum;
 }

@@ -296,11 +296,13 @@ int transformPacked(VSTransformData* td, VSTransform t)
   int channels = td->fiSrc.bytesPerPixel;
   /* All channels */
   for (y = 0; y < td->fiDest.height; y++) {
-    int32_t y_d1 = (y - c_d_y);
+    const int32_t y_d1 = (y - c_d_y);
+    const fp16 x_s_t = zsin_a * y_d1 + c_tx;
+    const fp16 y_s_t = zcos_a * y_d1 + c_ty;
     for (x = 0; x < td->fiDest.width; x++) {
       int32_t x_d1 = (x - c_d_x);
-      fp16 x_s  =  zcos_a * x_d1 + zsin_a * y_d1 + c_tx;
-      fp16 y_s  = -zsin_a * x_d1 + zcos_a * y_d1 + c_ty;
+      fp16 x_s  =  zcos_a * x_d1 + x_s_t;
+      fp16 y_s  = -zsin_a * x_d1 + y_s_t;
 
       for (k = 0; k < channels; k++) { // iterate over colors
         uint8_t *dest = &D_2[x + y * td->destbuf.linesize[0]+k];
@@ -365,6 +367,8 @@ int transformPlanar(VSTransformData* td, VSTransform t)
     fp16  c_tx    = c_s_x - (fToFp16(t.x) >> wsub);
     fp16  c_ty    = c_s_y - (fToFp16(t.y) >> hsub);
 
+    const int linesize = td->destbuf.linesize[plane];
+
     /* for each pixel in the destination image we calc the source
      * coordinate and make an interpolation:
      *      p_d = c_d + M(p_s - c_s) + t
@@ -375,12 +379,16 @@ int transformPlanar(VSTransformData* td, VSTransform t)
      */
     for (y = 0; y < dh; y++) {
       // swapping of the loops brought 15% performace gain
-      int32_t y_d1 = (y - c_d_y);
-      for (x = 0; x < dw; x++) {
-        int32_t x_d1 = (x - c_d_x);
-        fp16 x_s  =  zcos_a * x_d1 + zsin_a * y_d1 + c_tx;
-        fp16 y_s  = -zsin_a * x_d1 + zcos_a * y_d1 + c_ty;
-        uint8_t *dest = &dat_2[x + y * td->destbuf.linesize[plane]];
+      const int32_t y_d1 = (y - c_d_y);
+      const fp16 x_s_t = zsin_a * y_d1 + c_tx;
+      const fp16 y_s_t = zcos_a * y_d1 + c_ty;
+      uint8_t *dest = &dat_2[y * linesize];
+      
+      for (x = 0; x < dw; x++, dest++) {
+        const int32_t x_d1 = (x - c_d_x);
+        const fp16 x_s  =  zcos_a * x_d1 + x_s_t;
+        const fp16 y_s  = -zsin_a * x_d1 + y_s_t;
+        
         // inlining the interpolation function would bring 10%
         //  (but then we cannot use the function pointer anymore...)
         td->interpolate(dest, x_s, y_s, dat_1,

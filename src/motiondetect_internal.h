@@ -47,8 +47,7 @@ int initFields(VSMotionDetect* md, VSMotionDetectFields* fs,
 double contrastSubImgPlanar(VSMotionDetect* md, const Field* field);
 double contrastSubImgPacked(VSMotionDetect* md, const Field* field);
 double contrastSubImg(unsigned char* const I, const Field* field,
-                      int width, int height, int bytesPerPixel);
-
+                      int width, int height, int channels);
 
 int cmp_contrast_idx(const void *ci1, const void* ci2);
 VSVector selectfields(VSMotionDetect* md, VSMotionDetectFields* fields,

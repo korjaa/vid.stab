@@ -222,12 +222,15 @@ unsigned int compareSubImg_thr_sse2(unsigned char* const I1, unsigned char* cons
   unsigned char* p1 = NULL;
   unsigned char* p2 = NULL;
   int s2 = field->size / 2;
+  int p1_stride = (width1 - field->size) * bytesPerPixel;
+  int p2_stride = (width2 - field->size) * bytesPerPixel;
+  int k_len = field->size * bytesPerPixel;
   unsigned int sum = 0;
 
   p1=I1 + ((field->x - s2) + (field->y - s2)*width1)*bytesPerPixel;
   p2=I2 + ((field->x - s2 + d_x) + (field->y - s2 + d_y)*width2)*bytesPerPixel;
   for (j = 0; j < field->size; j++){
-    for (k = 0; k < field->size * bytesPerPixel; k+=16){
+    for (k = 0; k < k_len; k+=16){
       {
         __m128i a, b;
         a = _mm_loadu_si128((__m128i const *)p1);
@@ -245,8 +248,8 @@ unsigned int compareSubImg_thr_sse2(unsigned char* const I1, unsigned char* cons
 
     if (sum > treshold)
       break;
-    p1 += (width1 - field->size) * bytesPerPixel;
-    p2 += (width2 - field->size) * bytesPerPixel;
+    p1 += p1_stride;
+    p2 += p2_stride;
   }
 
   return sum;

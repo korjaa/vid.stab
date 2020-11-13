@@ -34,9 +34,9 @@ void _FLT(interpolateBiLinBorder)(uint8_t *rv, float x, float y,
                                   const uint8_t *img, int img_linesize,
                                   int width, int height, uint8_t def)
 {
-  int x_f = myfloor(x);
+  int x_f = FLOOR_FLOAT(x);
   int x_c = x_f+1;
-  int y_f = myfloor(y);
+  int y_f = FLOOR_FLOAT(y);
   int y_c = y_f+1;
   short v1 = PIXEL(img, img_linesize, x_c, y_c, width, height, def);
   short v2 = PIXEL(img, img_linesize, x_c, y_f, width, height, def);
@@ -70,8 +70,8 @@ void _FLT(interpolateBiCub)(uint8_t *rv, float x, float y,
   if (x < 1 || x > width - 2 || y < 1 || y > height - 2) {
     _FLT(interpolateBiLinBorder)(rv, x, y, img, img_linesize, width, height, def);
   } else {
-    int x_f = myfloor(x);
-    int y_f = myfloor(y);
+    int x_f = FLOOR_FLOAT(x);
+    int y_f = FLOOR_FLOAT(y);
     float tx = x-x_f;
     short v1 = _FLT(bicub_kernel)(tx,
                                   PIX(img, img_linesize, x_f-1, y_f-1),
@@ -107,9 +107,9 @@ void _FLT(interpolateBiLin)(uint8_t *rv, float x, float y,
   if (x < 0 || x > width - 1 || y < 0 || y > height - 1) {
     _FLT(interpolateBiLinBorder)(rv, x, y, img, img_linesize, width, height, def);
   } else {
-    int x_f = myfloor(x);
+    int x_f = FLOOR_FLOAT(x);
     int x_c = x_f+1;
-    int y_f = myfloor(y);
+    int y_f = FLOOR_FLOAT(y);
     int y_c = y_f+1;
     short v1 = PIX(img, img_linesize, x_c, y_c);
     short v2 = PIX(img, img_linesize, x_c, y_f);
@@ -128,9 +128,9 @@ void _FLT(interpolateLin)(uint8_t *rv, float x, float y,
                           const uint8_t *img, int img_linesize,
                           int width, int height, uint8_t def)
 {
-  int x_f = myfloor(x);
+  int x_f = FLOOR_FLOAT(x);
   int x_c = x_f+1;
-  int y_n = myround(y);
+  int y_n = ROUND_FLOAT(y);
   float v1 = PIXEL(img, img_linesize, x_c, y_n, width, height, def);
   float v2 = PIXEL(img, img_linesize, x_f, y_n, width, height, def);
   float s  = v1*(x - x_f) + v2*(x_c - x);
@@ -143,8 +143,8 @@ void _FLT(interpolateZero)(uint8_t *rv, float x, float y,
                            const uint8_t *img, int img_linesize,
                            int width, int height, uint8_t def)
 {
-  int x_n = myround(x);
-  int y_n = myround(y);
+  int x_n = ROUND_FLOAT(x);
+  int y_n = ROUND_FLOAT(y);
   *rv = (uint8_t) PIXEL(img, img_linesize, x_n, y_n, width, height, def);
 }
 
@@ -172,9 +172,9 @@ void _FLT(interpolateN)(uint8_t *rv, float x, float y,
   if (x < - 1 || x > width || y < -1 || y > height) {
     *rv = def;
   } else {
-    int x_f = myfloor(x);
+    int x_f = FLOOR_FLOAT(x);
     int x_c = x_f+1;
-    int y_f = myfloor(y);
+    int y_f = FLOOR_FLOAT(y);
     int y_c = y_f+1;
     short v1 = PIXELN(img, img_linesize, x_c, y_c, width, height, N, channel, def);
     short v2 = PIXELN(img, img_linesize, x_c, y_f, width, height, N, channel, def);
@@ -223,14 +223,16 @@ int _FLT(transformPacked)(VSTransformData* td, VSTransform t)
   int channels = td->fiSrc.bytesPerPixel;
   /* All channels */
   if (fabs(t.alpha) > 0.1*M_PI/180.0) { // 0.1 deg
-    for (x = 0; x < td->fiDest.width; x++) {
-      for (y = 0; y < td->fiDest.height; y++) {
-        float x_d1 = (x - c_d_x);
-        float y_d1 = (y - c_d_y);
-        float x_s  =  cos(-t.alpha) * x_d1
-          + sin(-t.alpha) * y_d1 + c_s_x -t.x;
-        float y_s  = -sin(-t.alpha) * x_d1
-          + cos(-t.alpha) * y_d1 + c_s_y -t.y;
+    for (y = 0; y < td->fiDest.height; y++) {
+      const float y_d1 = (y - c_d_y);
+      const float x_s_t = sin(-t.alpha) * y_d1 + c_s_x -t.x;
+      const float y_s_t = cos(-t.alpha) * y_d1 + c_s_y -t.y;
+      for (x = 0; x < td->fiDest.width; x++) {
+        const float x_d1 = (x - c_d_x);
+        const float x_s  =  cos(-t.alpha) * x_d1
+          + x_s_t;
+        const float y_s  = -sin(-t.alpha) * x_d1
+          + y_s_t;
         for (z = 0; z < channels; z++) { // iterate over colors
           uint8_t *dest = &D_2[x + y * td->destbuf.linesize[0]+z];
           _FLT(interpolateN)(dest, x_s, y_s, D_1, td->src.linesize[0],
@@ -243,10 +245,10 @@ int _FLT(transformPacked)(VSTransformData* td, VSTransform t)
     /* no rotation, just translation
      *(also no interpolation, since no size change (so far)
      */
-    int round_tx = myround(t.x);
-    int round_ty = myround(t.y);
-    for (x = 0; x < td->fiDest.width; x++) {
-      for (y = 0; y < td->fiDest.height; y++) {
+    int round_tx = ROUND_FLOAT(t.x);
+    int round_ty = ROUND_FLOAT(t.y);
+    for (y = 0; y < td->fiDest.height; y++) {
+      for (x = 0; x < td->fiDest.width; x++) {
         for (z = 0; z < channels; z++) { // iterate over colors
           short p = PIXELN(D_1, td->src.linesize[0], x - round_tx, y - round_ty,
                            td->fiSrc.width, td->fiSrc.height, channels, z, -1);
@@ -292,19 +294,19 @@ int _FLT(transformPlanar)(VSTransformData* td, VSTransform t)
     dat_1  = td->src.data[plane];
     dat_2  = td->destbuf.data[plane];
 
-    int wsub = vsGetPlaneWidthSubS(&td->fiSrc,plane);
-    int hsub = vsGetPlaneHeightSubS(&td->fiSrc,plane);
-    float c_s_x = (td->fiSrc.width  >> wsub)/2.0;
-    float c_s_y = (td->fiSrc.height >> hsub)/2.0;
-    float c_d_x = (td->fiDest.width >> wsub)/2.0;
-    float c_d_y = (td->fiDest.height>> hsub)/2.0;
-    uint8_t black = plane==0 ? 0 : 0x80;
+    const int wsub = vsGetPlaneWidthSubS(&td->fiSrc,plane);
+    const int hsub = vsGetPlaneHeightSubS(&td->fiSrc,plane);
+    const float c_s_x = (td->fiSrc.width  >> wsub)/2.0;
+    const float c_s_y = (td->fiSrc.height >> hsub)/2.0;
+    const float c_d_x = (td->fiDest.width >> wsub)/2.0;
+    const float c_d_y = (td->fiDest.height>> hsub)/2.0;
+    const uint8_t black = plane==0 ? 0 : 0x80;
 
-    float z = 1.0-t.zoom/100;
-    float zcos_a = z*cos(-t.alpha); // scaled cos
-    float zsin_a = z*sin(-t.alpha); // scaled sin
-    float tx = t.x / (float)(1 << wsub);
-    float ty = t.y / (float)(1 << hsub);
+    const float z = 1.0-t.zoom/100;
+    const float zcos_a = z*cos(-t.alpha); // scaled cos
+    const float zsin_a = z*sin(-t.alpha); // scaled sin
+    const float tx = t.x / (float)(1 << wsub);
+    const float ty = t.y / (float)(1 << hsub);
 
     /* for each pixel in the destination image we calc the source
      * coordinate and make an interpolation:
@@ -314,20 +316,25 @@ int _FLT(transformPlanar)(VSTransformData* td, VSTransform t)
      *  t the translation, and M the rotation and scaling matrix
      *      p_s = M^{-1}(p_d - c_d - t) + c_s
      */
-    int w = CHROMA_SIZE(td->fiDest.width,wsub);
-    int h = CHROMA_SIZE(td->fiDest.height,hsub);
-    int sw = CHROMA_SIZE(td->fiSrc.width,wsub);
-    int sh = CHROMA_SIZE(td->fiSrc.height,hsub);
-    for (x = 0; x < w; x++) {
-      for (y = 0; y < h; y++) {
-        float x_d1 = (x - c_d_x);
-        float y_d1 = (y - c_d_y);
-        float x_s  =  zcos_a * x_d1
-          + zsin_a * y_d1 + c_s_x -tx;
-        float y_s  = -zsin_a * x_d1
-          + zcos_a * y_d1 + c_s_y -ty;
-        uint8_t *dest = &dat_2[x + y * td->destbuf.linesize[plane]];
-        td->_FLT(interpolate)(dest, x_s, y_s, dat_1, td->src.linesize[plane],
+    const int w = CHROMA_SIZE(td->fiDest.width,wsub);
+    const int h = CHROMA_SIZE(td->fiDest.height,hsub);
+    const int sw = CHROMA_SIZE(td->fiSrc.width,wsub);
+    const int sh = CHROMA_SIZE(td->fiSrc.height,hsub);
+    const int linesize = td->destbuf.linesize[plane];
+    
+    for (y = 0; y < h; y++) {  
+      const float y_d1 = (y - c_d_y);
+      const float x_s_t = zsin_a * y_d1 + c_s_x - tx;
+      const float y_s_t = zcos_a * y_d1 + c_s_y - ty;
+      uint8_t *dest =  &dat_2[y * linesize];
+      for (x = 0; x < w; x++, dest++) {  
+        const float x_d1 = (x - c_d_x);
+        const float x_s  =  zcos_a * x_d1
+          + x_s_t;
+        const float y_s  = -zsin_a * x_d1
+          + y_s_t;
+        
+        td->_FLT(interpolate)(dest, x_s, y_s, dat_1, linesize,
                               sw, sh, crop ? black : *dest);
       }
     }

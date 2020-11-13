@@ -131,58 +131,61 @@ void boxblurPlanar(VSFrame* dest, const VSFrame* src,
 
 void boxblur_hori_C(unsigned char* dest, const unsigned char* src,
                     int width, int height, int dest_strive, int src_strive, int size){
-
   int i,j,k;
   unsigned int acc;
   const unsigned char *start, *end; // start and end of kernel
   unsigned char *current;     // current destination pixel
-  int size2 = size/2; // size of one side of the kernel without center
+  const int size2 = size / 2; // size of one side of the kernel without center
+  const int i_len = width - size2 - 1;
   // #pragma omp parallel for private(acc),schedule(guided,2) (no speedup)
-  for(j=0; j< height; j++){
+  for(j=0; j < height; j++){
     //  for(j=100; j< 101; j++){
-    start = end = src + j*src_strive;
+    start = src + j*src_strive;
+    end = start - 1;
     current = dest + j*dest_strive;
     // initialize accumulator
     acc= (*start)*(size2+1); // left half of kernel with first pixel
-    for(k=0; k<size2; k++){  // right half of kernel
-      acc+=(*end);
-      end++;
+    for(k=0; k < size2; k++){  // right half of kernel
+      acc += *++end;
     }
     // go through the image
-    for(i=0; i< width; i++){
+    for(i=0; i < width; i++){
       acc = acc + (*end) - (*start);
-      if(i > size2) start++;
-      if(i < width - size2 - 1) end++;
+      if(i > size2) ++start;
+      if(i < i_len) ++end;
       (*current) = acc/size;
-      current++;
+      ++current;
     }
   }
 }
 
 void boxblur_vert_C(unsigned char* dest, const unsigned char* src,
         int width, int height, int dest_strive, int src_strive, int size){
-
   int i,j,k;
   int acc;
   const unsigned char *start, *end; // start and end of kernel
   unsigned char *current;     // current destination pixel
-  int size2 = size/2; // size of one side of the kernel without center
-  for(i=0; i< width; i++){
+  const int size2 = size/2; // size of one side of the kernel without center
+  const int j_len = height - size2 - 1;
+
+  for(i=0; i < width; ++i){
     start = end = src + i;
     current = dest + i;
     // initialize accumulator
     acc= (*start)*(size2+1); // left half of kernel with first pixel
-    for(k=0; k<size2; k++){  // right half of kernel
+    for(k=0; k<size2; ++k, end+=src_strive){  // right half of kernel
       acc+=(*end);
-      end+=src_strive;
     }
     // go through the image
-    for(j=0; j< height; j++){
-      acc = acc - (*start) + (*end);
-      if(j > size2) start+=src_strive;
-      if(j < height - size2 - 1) end+=src_strive;
+    for(j=0; j< height; ++j, current+=dest_strive){
+      acc = acc - *start + *end;
+      if(j > size2) { 
+        start+=src_strive;
+      }
+      if(j < j_len) {
+        end+=src_strive;
+      }
       *current = acc/size;
-      current+=dest_strive;
     }
   }
 }
